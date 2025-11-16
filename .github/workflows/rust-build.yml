@@ -1,0 +1,32 @@
+name: Rust Build
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  compile:
+    runs-on: ubuntu-24.04
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: System deps
+      run: |
+        sudo apt update
+        sudo apt install -y build-essential pkg-config libssl-dev
+        which gcc
+        gcc --version
+    
+    - name: Rust
+      uses: dtolnay/rust-toolchain@stable
+    
+    - name: Compile
+      run: cargo build --release --verbose
+    
+    - name: Save
+      uses: actions/upload-artifact@v4
+      with:
+        name: binary
+        path: target/release/kucoin-ultimate-trading-bot
