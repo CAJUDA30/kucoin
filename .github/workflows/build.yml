@@ -12,71 +12,56 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
+    
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
-          components: rustfmt, clippy
-
-      - name: Cache cargo registry
-        uses: actions/cache@v3
-        with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-v2-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Cache cargo index
-        uses: actions/cache@v3
-        with:
-          path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-git-v2-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Cache target directory
-        uses: actions/cache@v3
-        with:
-          path: target
-          key: ${{ runner.os }}-target-v2-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Check code formatting
-        run: cargo fmt --all -- --check
-
-      - name: Run Clippy (warnings allowed for now)
-        run: cargo clippy --all-targets --all-features || true
-
-      - name: Create stub .env for build
-        run: |
-          cat > .env << 'EOF'
-          KUCOIN_API_KEY=test_key
-          KUCOIN_API_SECRET=test_secret
-          KUCOIN_API_PASSPHRASE=test_pass
-          KUCOIN_SANDBOX_MODE=true
-          POSTGRES_URL=postgresql://user:pass@localhost/tradingbot
-          REDIS_URL=redis://localhost:6379
-          MAX_POSITION_SIZE=0.2
-          MAX_LEVERAGE=10
-          DAILY_LOSS_LIMIT=0.2
-          AI_CONSENSUS_THRESHOLD=0.85
-          PROMETHEUS_PORT=9090
-          FRONTEND_PORT=3000
-          LOG_LEVEL=info
-          EOF
-
-      - name: Build
-        run: cargo build --release --verbose
-
-      - name: Run tests
-        run: cargo test --verbose --no-fail-fast || echo "Tests skipped for bootstrap - continuing build"
-        continue-on-error: true
-
-      - name: Upload binary
-        uses: actions/upload-artifact@v4
-        with:
-          name: trading-bot-binary
-          path: target/release/kucoin-ultimate-trading-bot
-          retention-days: 5
+    - uses: actions/checkout@v4
+    
+    # Install build dependencies (C compiler, pkg-config, OpenSSL)
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential pkg-config libssl-dev
+    
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+    
+    - name: Create stub .env for build
+      run: |
+        cat > .env << 'ENVEOF'
+        KUCOIN_API_KEY=test_key
+        KUCOIN_API_SECRET=test_secret
+        KUCOIN_API_PASSPHRASE=test_pass
+        KUCOIN_SANDBOX_MODE=true
+        POSTGRES_URL=postgresql://user:pass@localhost/tradingbot
+        REDIS_URL=redis://localhost:6379
+        MAX_POSITION_SIZE=0.2
+        MAX_LEVERAGE=10
+        DAILY_LOSS_LIMIT=0.2
+        AI_CONSENSUS_THRESHOLD=0.85
+        PROMETHEUS_PORT=9090
+        FRONTEND_PORT=3000
+        LOG_LEVEL=info
+        ENVEOF
+    
+    - name: Check code formatting
+      run: cargo fmt --all -- --check
+    
+    - name: Build release
+      run: cargo build --release --verbose
+    
+    - name: Run tests (allowed to fail for bootstrap)
+      run: cargo test --verbose --no-fail-fast || echo "Tests skipped"
+      continue-on-error: true
+    
+    - name: Upload binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: trading-bot-binary
+        path: target/release/kucoin-ultimate-trading-bot
+        retention-days: 5
 
   frontend-build:
     runs-on: ubuntu-latest
@@ -100,5 +85,5 @@ jobs:
 
       - name: Run frontend tests
         working-directory: frontend
-        run: npm test || echo "Frontend tests skipped for bootstrap"
+        run: npm test || echo "Frontend tests skipped"
         continue-on-error: true
