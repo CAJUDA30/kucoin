@@ -205,7 +205,7 @@ async fn scan_and_trade(
                 "🆕 NEW LISTING: {} @ {:.2} (detected {} ago)",
                 listing.symbol,
                 listing.initial_price,
-                format_duration(chrono::Utc::now() - listing.detected_at)
+                format_duration(chrono::Utc::now().signed_duration_since(listing.detected_at))
             );
         }
     }
