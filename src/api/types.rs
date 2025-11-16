@@ -10,6 +10,7 @@ pub struct KuCoinResponse<T> {
 #[serde(rename_all = "camelCase")]
 pub struct AccountInfo {
     pub account_equity: f64,
+    #[serde(rename = "unrealisedPNL")]
     pub unrealised_pnl: f64,
     pub margin_balance: f64,
     pub position_margin: f64,
