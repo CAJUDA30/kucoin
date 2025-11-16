@@ -91,6 +91,9 @@ impl TokenRegistry {
         database: &Arc<TokenDatabase>,
         cache: &Arc<RwLock<HashMap<String, TokenRecord>>>,
     ) -> Result<usize> {
+        use std::time::Instant;
+        let start = Instant::now();
+
         // Fetch all symbols from API
         let symbols = match client.get_all_symbols().await {
             Ok(syms) => syms,
@@ -100,27 +103,43 @@ impl TokenRegistry {
             }
         };
 
-        let now = Utc::now();
-        let mut updated_count = 0;
-        let mut new_symbols = Vec::new();
+        let api_fetch_time = start.elapsed();
+        tracing::debug!("⚡ API fetch completed in {:.2}ms", api_fetch_time.as_secs_f64() * 1000.0);
 
+        // OPTIMIZATION 1: Batch load existing tokens from database (single query)
+        let db_start = Instant::now();
+        let existing_tokens = database.get_all_tokens().await?;
+        let existing_map: HashMap<String, TokenRecord> = existing_tokens
+            .into_iter()
+            .map(|t| (t.symbol.clone(), t))
+            .collect();
+        let db_load_time = db_start.elapsed();
+        tracing::debug!("⚡ Database load completed in {:.2}ms ({} tokens)", 
+            db_load_time.as_secs_f64() * 1000.0, existing_map.len());
+
+        let now = Utc::now();
+        let mut new_symbols = Vec::new();
+        let mut records_to_upsert = Vec::new();
+        let mut history_events = Vec::new();
+
+        // OPTIMIZATION 2: Build all records in memory first (no I/O in loop)
+        let process_start = Instant::now();
         for symbol in &symbols {
-            // Check if this is a new token
-            let existing = database.get_token(&symbol.symbol).await?;
+            let existing = existing_map.get(&symbol.symbol);
             let is_new = existing.is_none();
 
             let token_record = TokenRecord {
                 symbol: symbol.symbol.clone(),
                 base_currency: symbol.base_currency.clone(),
                 quote_currency: symbol.quote_currency.clone(),
-                first_seen: existing.as_ref().map(|t| t.first_seen).unwrap_or(now),
+                first_seen: existing.map(|t| t.first_seen).unwrap_or(now),
                 last_seen: now,
                 status: if symbol.status == "Open" {
                     "active".to_string()
                 } else {
                     "suspended".to_string()
                 },
-                is_new: is_new, // Set based on whether token existed before
+                is_new,
                 delisted_at: None,
                 lot_size: Some(symbol.lot_size as f64),
                 tick_size: Some(symbol.tick_size),
@@ -136,24 +155,47 @@ impl TokenRegistry {
                 }).unwrap_or_default(),
             };
 
-            // Save to database
-            database.upsert_token(&token_record).await?;
-
-            // Update cache
-            cache.write().await.insert(symbol.symbol.clone(), token_record.clone());
+            records_to_upsert.push(token_record.clone());
 
             if is_new {
-                new_symbols.push(token_record);
-                database.add_history_event(&symbol.symbol, "new_listing", None).await?;
+                new_symbols.push(token_record.clone());
+                history_events.push((symbol.symbol.clone(), "new_listing".to_string()));
             }
+        }
+        let process_time = process_start.elapsed();
+        tracing::debug!("⚡ Record processing completed in {:.2}ms", process_time.as_secs_f64() * 1000.0);
 
-            updated_count += 1;
+        // OPTIMIZATION 3: Batch database operations
+        let batch_start = Instant::now();
+        database.batch_upsert_tokens(&records_to_upsert).await?;
+        let batch_time = batch_start.elapsed();
+        tracing::debug!("⚡ Batch upsert completed in {:.2}ms ({} records)", 
+            batch_time.as_secs_f64() * 1000.0, records_to_upsert.len());
+
+        // OPTIMIZATION 4: Batch history events
+        if !history_events.is_empty() {
+            let history_start = Instant::now();
+            database.batch_add_history_events(&history_events).await?;
+            let history_time = history_start.elapsed();
+            tracing::debug!("⚡ History events completed in {:.2}ms ({} events)", 
+                history_time.as_secs_f64() * 1000.0, history_events.len());
         }
 
-        // Log new listings with visual badges
+        // OPTIMIZATION 5: Single cache update with write lock
+        let cache_start = Instant::now();
+        {
+            let mut cache_write = cache.write().await;
+            for record in records_to_upsert.iter() {
+                cache_write.insert(record.symbol.clone(), record.clone());
+            }
+        }
+        let cache_time = cache_start.elapsed();
+        tracing::debug!("⚡ Cache update completed in {:.2}ms", cache_time.as_secs_f64() * 1000.0);
+
+        // Log new listings (only show first 10 for performance)
         if !new_symbols.is_empty() {
             tracing::info!("🆕 NEW LISTINGS DETECTED: {} tokens", new_symbols.len());
-            for token in &new_symbols {
+            for token in new_symbols.iter().take(10) {
                 tracing::info!(
                     "  {} {} ({}/{}) - {}",
                     token.get_badge(),
@@ -163,24 +205,49 @@ impl TokenRegistry {
                     token.get_colored_status()
                 );
             }
+            if new_symbols.len() > 10 {
+                tracing::info!("  ... and {} more", new_symbols.len() - 10);
+            }
         }
 
-        // Check for delisted tokens
-        let cached_symbols: Vec<String> = cache.read().await.keys().cloned().collect();
+        // OPTIMIZATION 6: Efficient delisting check using HashSet
+        let delist_start = Instant::now();
         let api_symbols: std::collections::HashSet<String> = symbols
             .iter()
             .map(|s| s.symbol.clone())
             .collect();
 
+        let cached_symbols: Vec<String> = cache.read().await.keys().cloned().collect();
+        let mut delisted = Vec::new();
+
         for cached_symbol in cached_symbols {
             if !api_symbols.contains(&cached_symbol) {
-                tracing::warn!("⚠️  Token possibly delisted: {}", cached_symbol);
-                database.mark_as_delisted(&cached_symbol).await?;
-                cache.write().await.remove(&cached_symbol);
+                delisted.push(cached_symbol);
             }
         }
 
-        Ok(updated_count)
+        if !delisted.is_empty() {
+            tracing::warn!("⚠️  {} tokens possibly delisted", delisted.len());
+            database.batch_mark_as_delisted(&delisted).await?;
+            let mut cache_write = cache.write().await;
+            for symbol in &delisted {
+                cache_write.remove(symbol);
+            }
+        }
+        let delist_time = delist_start.elapsed();
+        tracing::debug!("⚡ Delisting check completed in {:.2}ms", delist_time.as_secs_f64() * 1000.0);
+
+        let total_time = start.elapsed();
+        tracing::info!("⚡ PERFORMANCE: Total sync time: {:.2}ms (API: {:.2}ms, DB: {:.2}ms, Process: {:.2}ms, Batch: {:.2}ms, Cache: {:.2}ms)", 
+            total_time.as_secs_f64() * 1000.0,
+            api_fetch_time.as_secs_f64() * 1000.0,
+            db_load_time.as_secs_f64() * 1000.0,
+            process_time.as_secs_f64() * 1000.0,
+            batch_time.as_secs_f64() * 1000.0,
+            cache_time.as_secs_f64() * 1000.0
+        );
+
+        Ok(records_to_upsert.len())
     }
 
     async fn sync_all_tokens(&self) -> Result<()> {

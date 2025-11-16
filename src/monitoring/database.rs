@@ -133,7 +133,7 @@ impl TokenDatabase {
         .execute(&self.pool)
         .await?;
 
-        // Create index for faster queries
+        // OPTIMIZATION: Create indices for faster queries
         sqlx::query(
             r#"
             CREATE INDEX IF NOT EXISTS idx_token_history_symbol 
@@ -151,6 +151,41 @@ impl TokenDatabase {
         )
         .execute(&self.pool)
         .await?;
+
+        // OPTIMIZATION: Index for new listings queries
+        sqlx::query(
+            r#"
+            CREATE INDEX IF NOT EXISTS idx_tokens_is_new 
+            ON tokens(is_new, first_seen DESC) WHERE is_new = 1
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+
+        // OPTIMIZATION: Composite index for active tokens
+        sqlx::query(
+            r#"
+            CREATE INDEX IF NOT EXISTS idx_tokens_status_active 
+            ON tokens(status, last_seen DESC) WHERE status = 'active'
+            "#,
+        )
+        .execute(&self.pool)
+        .await?;
+
+        // OPTIMIZATION: Enable WAL mode for better concurrency
+        sqlx::query("PRAGMA journal_mode = WAL")
+            .execute(&self.pool)
+            .await?;
+
+        // OPTIMIZATION: Increase cache size (10MB)
+        sqlx::query("PRAGMA cache_size = -10000")
+            .execute(&self.pool)
+            .await?;
+
+        // OPTIMIZATION: Enable memory-mapped I/O (faster reads)
+        sqlx::query("PRAGMA mmap_size = 30000000000")
+            .execute(&self.pool)
+            .await?;
 
         tracing::info!("✅ Token database schema initialized");
 
@@ -218,6 +253,124 @@ impl TokenDatabase {
         .execute(&self.pool)
         .await?;
 
+        Ok(())
+    }
+
+    /// OPTIMIZATION: Batch upsert tokens (up to 100x faster than individual inserts)
+    pub async fn batch_upsert_tokens(&self, tokens: &[TokenRecord]) -> Result<()> {
+        if tokens.is_empty() {
+            return Ok(());
+        }
+
+        // Use transaction for atomicity and performance
+        let mut tx = self.pool.begin().await?;
+
+        // Batch size of 100 to avoid SQL parameter limits
+        for chunk in tokens.chunks(100) {
+            let mut query_builder = sqlx::QueryBuilder::new(
+                r#"INSERT INTO tokens (
+                    symbol, base_currency, quote_currency, first_seen, last_seen,
+                    status, is_new, delisted_at, lot_size, tick_size, multiplier, max_leverage,
+                    funding_rate_symbol, metadata
+                ) "#
+            );
+
+            query_builder.push_values(chunk, |mut b, token| {
+                b.push_bind(&token.symbol)
+                    .push_bind(&token.base_currency)
+                    .push_bind(&token.quote_currency)
+                    .push_bind(&token.first_seen)
+                    .push_bind(&token.last_seen)
+                    .push_bind(&token.status)
+                    .push_bind(token.is_new)
+                    .push_bind(token.delisted_at)
+                    .push_bind(token.lot_size)
+                    .push_bind(token.tick_size)
+                    .push_bind(token.multiplier)
+                    .push_bind(token.max_leverage)
+                    .push_bind(&token.funding_rate_symbol)
+                    .push_bind(&token.metadata);
+            });
+
+            query_builder.push(
+                r#" ON CONFLICT(symbol) DO UPDATE SET
+                    last_seen = excluded.last_seen,
+                    status = excluded.status,
+                    is_new = excluded.is_new,
+                    delisted_at = excluded.delisted_at,
+                    lot_size = excluded.lot_size,
+                    tick_size = excluded.tick_size,
+                    multiplier = excluded.multiplier,
+                    max_leverage = excluded.max_leverage,
+                    funding_rate_symbol = excluded.funding_rate_symbol,
+                    metadata = excluded.metadata
+                "#
+            );
+
+            query_builder.build().execute(&mut *tx).await?;
+        }
+
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// OPTIMIZATION: Batch add history events
+    pub async fn batch_add_history_events(&self, events: &[(String, String)]) -> Result<()> {
+        if events.is_empty() {
+            return Ok(());
+        }
+
+        let mut tx = self.pool.begin().await?;
+        let now = Utc::now();
+
+        for chunk in events.chunks(100) {
+            let mut query_builder = sqlx::QueryBuilder::new(
+                "INSERT INTO token_history (symbol, event_type, event_time, details) "
+            );
+
+            query_builder.push_values(chunk, |mut b, (symbol, event_type)| {
+                b.push_bind(symbol)
+                    .push_bind(event_type)
+                    .push_bind(now)
+                    .push_bind(None::<String>);
+            });
+
+            query_builder.build().execute(&mut *tx).await?;
+        }
+
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// OPTIMIZATION: Batch mark tokens as delisted
+    pub async fn batch_mark_as_delisted(&self, symbols: &[String]) -> Result<()> {
+        if symbols.is_empty() {
+            return Ok(());
+        }
+
+        let now = Utc::now();
+        let mut tx = self.pool.begin().await?;
+
+        for chunk in symbols.chunks(100) {
+            let placeholders = chunk.iter()
+                .map(|_| "?")
+                .collect::<Vec<_>>()
+                .join(",");
+
+            let query_str = format!(
+                "UPDATE tokens SET status = 'delisted', delisted_at = ? WHERE symbol IN ({})",
+                placeholders
+            );
+
+            let mut query = sqlx::query(&query_str).bind(now);
+            for symbol in chunk {
+                query = query.bind(symbol);
+            }
+
+            query.execute(&mut *tx).await?;
+        }
+
+        tx.commit().await?;
         Ok(())
     }
 
