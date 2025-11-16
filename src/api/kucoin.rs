@@ -4,9 +4,11 @@ use hmac::{Hmac, Mac};
 use reqwest::Client;
 use serde::de::DeserializeOwned;
 use sha2::Sha256;
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::types::*;
+use super::rate_limiter::{KuCoinRateLimiter, RateLimitConfig};
 use crate::core::Config;
 
 type HmacSha256 = Hmac<Sha256>;
@@ -14,14 +16,23 @@ type HmacSha256 = Hmac<Sha256>;
 pub struct KuCoinClient {
     client: Client,
     config: Config,
+    rate_limiter: Arc<KuCoinRateLimiter>,
 }
 
 impl KuCoinClient {
     pub fn new(config: Config) -> Self {
+        let rate_limiter = Arc::new(KuCoinRateLimiter::new(RateLimitConfig::default()));
+        
         Self {
             client: Client::new(),
             config,
+            rate_limiter,
         }
+    }
+    
+    /// Get rate limiter statistics
+    pub async fn get_rate_limit_stats(&self) -> super::rate_limiter::RateLimiterStats {
+        self.rate_limiter.get_stats().await
     }
 
     fn generate_signature(
@@ -54,6 +65,12 @@ impl KuCoinClient {
         endpoint: &str,
         body: Option<serde_json::Value>,
     ) -> Result<T> {
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // RATE LIMITING ENFORCEMENT - DO NOT BYPASS!
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        let weight = KuCoinRateLimiter::get_endpoint_weight(endpoint);
+        let _guard = self.rate_limiter.acquire(endpoint, weight).await?;
+        
         let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64;
 
         let body_str = body

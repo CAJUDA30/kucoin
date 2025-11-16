@@ -64,8 +64,9 @@ impl MarketScanner {
                     Ok(symbols) => {
                         tracing::debug!("📊 Scanning {} active symbols", symbols.len());
                         
-                        // OPTIMIZATION 1: Process in batches of 50 for better performance
-                        let batch_size = 50;
+                        // OPTIMIZATION 1: Process in batches of 20 (KuCoin rate limit compliant)
+                        // Note: Reduced from 50 to prevent 429 errors and comply with API limits
+                        let batch_size = 20;
                         let symbol_batches: Vec<_> = symbols.chunks(batch_size).collect();
                         
                         // OPTIMIZATION 2: Pre-check new listings once (batch lookup)
