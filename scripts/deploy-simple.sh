@@ -11,7 +11,7 @@ echo "🚀 Starting simplified deployment to $EC2_HOST..."
 echo "📥 Downloading latest Linux binary from GitHub Actions..."
 gh run download \
   --repo CAJUDA30/kucoin \
-  --name trading-bot-binary
+  --name binary
 
 chmod +x kucoin-ultimate-trading-bot
 
@@ -31,7 +31,11 @@ ssh -i "$EC2_KEY_FILE" ${EC2_USER}@${EC2_HOST} << 'REMOTE'
   
   # Create .env
   cat > .env << 'ENV'
-KUCOIN_SANDBOX_MODE=true
+KUCOIN_API_KEY=69170b14b40b2f000188f594
+KUCOIN_API_SECRET=5c31c593-a97f-4d73-9abd-233e41f90d32
+KUCOIN_API_PASSPHRASE=apishortbot
+KUCOIN_SANDBOX_MODE=false
+KUCOIN_BASE_URL=https://api-futures.kucoin.com
 FRONTEND_PORT=3000
 LOG_LEVEL=info
 PROMETHEUS_PORT=9090

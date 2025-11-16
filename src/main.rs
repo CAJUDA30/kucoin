@@ -44,13 +44,58 @@ async fn main() -> Result<()> {
                     tracing::info!("✅ KuCoin API authentication successful");
                     health_checker.update_component("kucoin_api", true).await;
 
-                    // Fetch account info
+                    // Fetch comprehensive account info
+                    tracing::info!("📊 Fetching account details...");
+                    
+                    // Try default account overview
                     if let Ok(account) = kucoin_client.get_account_info().await {
                         tracing::info!(
-                            "💰 Account equity: {:.2} (available: {:.2})",
+                            "💰 Futures Account (default currency: {}): equity={:.2}, available={:.2}, margin={:.2}",
+                            account.currency,
                             account.account_equity,
-                            account.available_balance
+                            account.available_balance,
+                            account.margin_balance
                         );
+                    }
+                    
+                    // Try USDT explicitly
+                    if let Ok(account_usdt) = kucoin_client.get_account_overview_currency("USDT").await {
+                        tracing::info!(
+                            "💰 USDT Account: equity={:.2}, available={:.2}, margin={:.2}, position_margin={:.2}",
+                            account_usdt.account_equity,
+                            account_usdt.available_balance,
+                            account_usdt.margin_balance,
+                            account_usdt.position_margin
+                        );
+                    }
+                    
+                    // Try XBT (Bitcoin) explicitly
+                    if let Ok(account_xbt) = kucoin_client.get_account_overview_currency("XBT").await {
+                        tracing::info!(
+                            "💰 XBT Account: equity={:.8}, available={:.8}, margin={:.8}",
+                            account_xbt.account_equity,
+                            account_xbt.available_balance,
+                            account_xbt.margin_balance
+                        );
+                    }
+                    
+                    // Get all positions
+                    if let Ok(positions) = kucoin_client.get_positions().await {
+                        if positions.is_empty() {
+                            tracing::info!("📍 No open positions");
+                        } else {
+                            tracing::info!("📍 Open positions: {}", positions.len());
+                            for pos in positions {
+                                tracing::info!(
+                                    "  • {} qty={:.4} cost={:.2} pnl={:.2} leverage={}x",
+                                    pos.symbol,
+                                    pos.current_qty,
+                                    pos.current_cost,
+                                    pos.unrealised_pnl,
+                                    pos.leverage
+                                );
+                            }
+                        }
                     }
                 }
                 Ok(false) => {

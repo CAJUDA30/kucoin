@@ -115,11 +115,26 @@ impl KuCoinClient {
 
     // Account endpoints
     pub async fn get_account_info(&self) -> Result<AccountInfo> {
-        self.request("GET", "/api/v1/account-overview", None).await
+        tracing::debug!("Fetching futures account overview...");
+        let result: AccountInfo = self.request("GET", "/api/v1/account-overview", None).await?;
+        tracing::debug!("Account overview response: {:?}", result);
+        Ok(result)
     }
 
     pub async fn get_positions(&self) -> Result<Vec<Position>> {
-        self.request("GET", "/api/v1/positions", None).await
+        tracing::debug!("Fetching all positions...");
+        let result: Vec<Position> = self.request("GET", "/api/v1/positions", None).await?;
+        tracing::debug!("Positions response: {} positions found", result.len());
+        Ok(result)
+    }
+    
+    // Get account overview with specific currency
+    pub async fn get_account_overview_currency(&self, currency: &str) -> Result<AccountInfo> {
+        let endpoint = format!("/api/v1/account-overview?currency={}", currency);
+        tracing::debug!("Fetching account overview for currency: {}", currency);
+        let result: AccountInfo = self.request("GET", &endpoint, None).await?;
+        tracing::debug!("Account overview for {}: {:?}", currency, result);
+        Ok(result)
     }
 
     // Market data endpoints (public, no auth needed)
