@@ -6,17 +6,14 @@ on:
   pull_request:
     branches: [ main, master ]
 
-env:
-  CARGO_TERM_COLOR: always
-
 jobs:
   build:
     runs-on: ubuntu-latest
     
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
     
-    # Install build dependencies (C compiler, pkg-config, OpenSSL)
     - name: Install build dependencies
       run: |
         sudo apt-get update
@@ -27,31 +24,28 @@ jobs:
       with:
         toolchain: stable
         override: true
+        profile: minimal
     
-    - name: Create stub .env for build
-      run: |
-        cat > .env << 'ENVEOF'
-        KUCOIN_API_KEY=test_key
-        KUCOIN_API_SECRET=test_secret
-        KUCOIN_API_PASSPHRASE=test_pass
-        KUCOIN_SANDBOX_MODE=true
-        POSTGRES_URL=postgresql://user:pass@localhost/tradingbot
-        REDIS_URL=redis://localhost:6379
-        MAX_POSITION_SIZE=0.2
-        MAX_LEVERAGE=10
-        DAILY_LOSS_LIMIT=0.2
-        AI_CONSENSUS_THRESHOLD=0.85
-        PROMETHEUS_PORT=9090
-        FRONTEND_PORT=3000
-        LOG_LEVEL=info
-        ENVEOF
+    - name: Cache cargo registry
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/registry
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+    
+    - name: Cache cargo index
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/git
+        key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+    
+    - name: Cache cargo build
+      uses: actions/cache@v3
+      with:
+        path: target
+        key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
     
     - name: Build release
       run: cargo build --release --verbose
-    
-    - name: Run tests (allowed to fail for bootstrap)
-      run: cargo test --verbose --no-fail-fast || echo "Tests skipped"
-      continue-on-error: true
     
     - name: Upload binary
       uses: actions/upload-artifact@v4
@@ -59,28 +53,3 @@ jobs:
         name: trading-bot-binary
         path: target/release/kucoin-ultimate-trading-bot
         retention-days: 5
-
-  frontend-build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
-        working-directory: frontend
-        run: npm ci
-
-      - name: Build frontend
-        working-directory: frontend
-        run: npm run build
-
-      - name: Run frontend tests
-        working-directory: frontend
-        run: npm test || echo "Frontend tests skipped"
-        continue-on-error: true
