@@ -7,12 +7,16 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    
     steps:
-    - name: Checkout
+    - name: Checkout code
       uses: actions/checkout@v4
     
-    - name: Install build tools
-      run: sudo apt-get update && sudo apt-get install -y build-essential pkg-config libssl-dev
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential pkg-config libssl-dev
+        gcc --version
     
     - name: Install Rust
       uses: actions-rs/toolchain@v1
@@ -20,10 +24,10 @@ jobs:
         toolchain: stable
         override: true
     
-    - name: Build
-      run: cargo build --release
+    - name: Build release
+      run: cargo build --release --verbose
     
-    - name: Upload artifact
+    - name: Upload binary
       uses: actions/upload-artifact@v4
       with:
         name: trading-bot-binary
