@@ -1,0 +1,46 @@
+# Rust
+/target/
+**/*.rs.bk
+Cargo.lock
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+
+# Environment
+.env
+.env.local
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# AI Models (too large for git)
+*.onnx
+*.pt
+*.pth
+
+# Database
+*.db
+*.sqlite
+
+# Build artifacts
+dist/
+build/
+*.exe
+*.dll

@@ -1,0 +1,78 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: x86_64-unknown-linux-gnu
+
+      - name: Build release binary
+        run: cargo build --release --target x86_64-unknown-linux-gnu
+
+      - name: Package application
+        run: |
+          mkdir -p deploy
+          cp target/x86_64-unknown-linux-gnu/release/kucoin-ultimate-trading-bot deploy/
+          cp -r docker deploy/
+          cp -r frontend/build deploy/frontend
+          tar -czf trading-bot-deploy.tar.gz deploy/
+
+      - name: Upload to S3
+        run: |
+          aws s3 cp trading-bot-deploy.tar.gz s3://your-deployment-bucket/releases/trading-bot-${GITHUB_SHA}.tar.gz
+
+      - name: Deploy to EC2
+        env:
+          SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+        run: |
+          echo "$SSH_KEY" > private_key.pem
+          chmod 600 private_key.pem
+
+          ssh -i private_key.pem -o StrictHostKeyChecking=no ubuntu@$EC2_HOST << 'EOF'
+            cd /opt/trading-bot
+
+            # Download latest build
+            aws s3 cp s3://your-deployment-bucket/releases/trading-bot-${GITHUB_SHA}.tar.gz .
+
+            # Backup current version
+            if [ -d "current" ]; then
+              mv current backup-$(date +%Y%m%d-%H%M%S)
+            fi
+
+            # Extract new version
+            tar -xzf trading-bot-${GITHUB_SHA}.tar.gz
+            mv deploy current
+
+            # Restart services
+            cd current/docker
+            docker-compose down
+            docker-compose up -d
+
+            # Health check
+            sleep 10
+            curl -f http://localhost:3000/health || exit 1
+
+            echo "Deployment successful!"
+          EOF
+
+          rm -f private_key.pem

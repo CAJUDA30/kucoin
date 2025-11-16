@@ -1,0 +1,10 @@
+version: "3.9"
+services:
+  bot:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.bot
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend

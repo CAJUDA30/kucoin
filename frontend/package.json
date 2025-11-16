@@ -1,0 +1,17 @@
+{
+  "name": "trading-bot-pro-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "echo 'stub dev server'",
+    "build": "echo 'stub build'",
+    "test": "echo 'stub tests'"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.2"
+  }
+}

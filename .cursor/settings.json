@@ -1,0 +1,14 @@
+{
+  "cursor.ai.model": "claude-sonnet-4-5-20250929",
+  "cursor.ai.enabled": true,
+  "cursor.ai.autoSuggest": true,
+  "editor.inlineSuggest.enabled": true,
+  "editor.quickSuggestions": {
+    "other": true,
+    "comments": true,
+    "strings": true
+  },
+  "rust-analyzer.check.command": "clippy",
+  "rust-analyzer.cargo.features": "all"
+}
+
