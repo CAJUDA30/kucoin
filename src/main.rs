@@ -132,8 +132,11 @@ async fn main() -> Result<()> {
     // Initialize comprehensive token monitoring system FIRST
     tracing::info!("🗂️  Initializing token monitoring system...");
     
+    // Create data directory if it doesn't exist
+    std::fs::create_dir_all("data").ok();
+    
     let token_db = Arc::new(
-        monitoring::TokenDatabase::new("/Users/carlosjulia/trading-bot-pro/data/tokens.db")
+        monitoring::TokenDatabase::new("data/tokens.db")
             .await
             .expect("Failed to initialize token database")
     );
