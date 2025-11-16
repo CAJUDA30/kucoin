@@ -1,5 +1,7 @@
 mod api;
 mod core;
+mod scanner;
+mod strategy;
 
 use anyhow::Result;
 use api::KuCoinClient;
