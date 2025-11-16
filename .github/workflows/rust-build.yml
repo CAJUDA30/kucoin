@@ -15,16 +15,16 @@ jobs:
     - name: System deps
       run: |
         sudo apt update
-        sudo apt install -y build-essential pkg-config libssl-dev gcc-x86-64-linux-gnu
-        which gcc
+        sudo apt install -y build-essential pkg-config libssl-dev
         gcc --version
-        which x86_64-linux-gnu-gcc || echo "x86_64-linux-gnu-gcc not found, using gcc"
     
     - name: Rust
       uses: dtolnay/rust-toolchain@stable
     
     - name: Compile
       run: cargo build --release --verbose
+      env:
+        CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER: gcc
     
     - name: Save
       uses: actions/upload-artifact@v4
