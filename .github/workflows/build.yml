@@ -26,19 +26,19 @@ jobs:
         uses: actions/cache@v3
         with:
           path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-registry-v2-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Cache cargo index
         uses: actions/cache@v3
         with:
           path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-git-v2-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Cache target directory
         uses: actions/cache@v3
         with:
           path: target
-          key: ${{ runner.os }}-target-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-target-v2-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Check code formatting
         run: cargo fmt --all -- --check
