@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -16,6 +17,20 @@ pub struct ComponentHealth {
     pub redis: bool,
     pub kucoin_api: bool,
     pub ai_models: bool,
+    #[serde(flatten)]
+    pub extra: HashMap<String, bool>,
+}
+
+impl ComponentHealth {
+    pub fn get(&self, key: &str) -> Option<bool> {
+        match key {
+            "database" => Some(self.database),
+            "redis" => Some(self.redis),
+            "kucoin_api" => Some(self.kucoin_api),
+            "ai_models" => Some(self.ai_models),
+            _ => self.extra.get(key).copied(),
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -33,6 +48,7 @@ impl HealthChecker {
                 redis: false,
                 kucoin_api: false,
                 ai_models: false,
+                extra: HashMap::new(),
             })),
         }
     }
@@ -41,7 +57,7 @@ impl HealthChecker {
         let components = self.status.read().await.clone();
 
         HealthStatus {
-            status: if components.database && components.redis {
+            status: if components.kucoin_api {
                 "healthy".to_string()
             } else {
                 "degraded".to_string()
@@ -59,7 +75,9 @@ impl HealthChecker {
             "redis" => status.redis = healthy,
             "kucoin_api" => status.kucoin_api = healthy,
             "ai_models" => status.ai_models = healthy,
-            _ => {}
+            _ => {
+                status.extra.insert(component.to_string(), healthy);
+            }
         }
     }
 }

@@ -1,5 +1,6 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use std::fmt;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 pub enum SignalType {
@@ -8,6 +9,18 @@ pub enum SignalType {
     CloseLong,
     CloseShort,
     Hold,
+}
+
+impl fmt::Display for SignalType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            SignalType::Long => write!(f, "LONG"),
+            SignalType::Short => write!(f, "SHORT"),
+            SignalType::CloseLong => write!(f, "CLOSE_LONG"),
+            SignalType::CloseShort => write!(f, "CLOSE_SHORT"),
+            SignalType::Hold => write!(f, "HOLD"),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
