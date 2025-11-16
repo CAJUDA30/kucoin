@@ -297,13 +297,14 @@ async fn print_status(
         if status.components.get("ai_engine").unwrap_or(false) { "✅" } else { "⏸️" });
     tracing::info!("│                                                    │");
 
-    // Account info
+    // Account info (use USDT account as primary)
     if status.components.kucoin_api {
-        if let Ok(account) = kucoin_client.get_account_info().await {
-            tracing::info!("│ 💰 Account:                                        │");
-            tracing::info!("│   • Equity:     {:.2}                    ", account.account_equity);
-            tracing::info!("│   • Available:  {:.2}                    ", account.available_balance);
-            tracing::info!("│   • PnL:        {:.2}                    ", account.unrealised_pnl);
+        if let Ok(account) = kucoin_client.get_account_overview_currency("USDT").await {
+            tracing::info!("│ 💰 Account (USDT):                                 │");
+            tracing::info!("│   • Equity:     {:.2} USDT                    ", account.account_equity);
+            tracing::info!("│   • Available:  {:.2} USDT                    ", account.available_balance);
+            tracing::info!("│   • Margin:     {:.2} USDT                    ", account.margin_balance);
+            tracing::info!("│   • PnL:        {:.2} USDT                    ", account.unrealised_pnl);
         }
     }
 
