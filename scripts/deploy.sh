@@ -57,8 +57,8 @@ ssh -i "$EC2_KEY_FILE" "${EC2_USER}@${EC2_HOST}" <<EOF
 
   # Restart
   cd docker
-  docker-compose down
-  docker-compose up -d
+  docker compose down || true
+  docker compose up -d
 
   # Health check
   sleep 10

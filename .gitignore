@@ -44,3 +44,9 @@ dist/
 build/
 *.exe
 *.dll
+*.tar.gz
+deploy.tar.gz
+
+# Node
+node_modules/
+frontend/node_modules/

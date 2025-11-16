@@ -24,14 +24,14 @@ ssh -i "$EC2_KEY_FILE" "${EC2_USER}@${EC2_HOST}" <<EOF
   echo "Rolling back to: \$BACKUP"
 
   cd "\$DEPLOY_DIR/current/docker"
-  docker-compose down
+  docker compose down || true
 
   cd "\$DEPLOY_DIR"
   mv current "failed-deploy-\$(date +%Y%m%d-%H%M%S)"
   mv "\$BACKUP" current
 
   cd current/docker
-  docker-compose up -d
+  docker compose up -d
 
   sleep 10
   curl -f "http://localhost:\$FRONTEND_PORT/health" || exit 1

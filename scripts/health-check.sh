@@ -15,7 +15,7 @@ ssh -i "$EC2_KEY_FILE" "${EC2_USER}@${EC2_HOST}" <<EOF
   DEPLOY_DIR="$DEPLOY_DIR"
   if [ -d "\$DEPLOY_DIR/current/docker" ]; then
     cd "\$DEPLOY_DIR/current/docker"
-    docker compose ps
+    docker compose ps 2>/dev/null || docker ps
   else
     echo "⚠️  No deployment found (current/docker directory does not exist)"
   fi
