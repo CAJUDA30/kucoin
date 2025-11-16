@@ -4,6 +4,7 @@ use tokio::sync::RwLock;
 
 use crate::api::KuCoinClient;
 use crate::core::Config;
+use crate::monitoring::TokenRegistry; // ← ADD THIS
 use crate::scanner::MarketScanner;
 use crate::strategy::AIStrategyEngine;
 use super::order_manager::OrderManager;
@@ -14,6 +15,7 @@ pub struct TradingOrchestrator {
     order_manager: Arc<OrderManager>,
     risk_manager: Arc<RwLock<RiskManager>>,
     ai_engine: Arc<RwLock<AIStrategyEngine>>,
+    token_registry: Arc<TokenRegistry>, // ← ADD THIS
     config: Config,
     enabled: bool,
 }
@@ -21,10 +23,14 @@ pub struct TradingOrchestrator {
 impl TradingOrchestrator {
     pub fn new(
         client: Arc<KuCoinClient>,
+        token_registry: Arc<TokenRegistry>, // ← ADD THIS PARAMETER
         config: Config,
         paper_trading: bool,
     ) -> Self {
-        let scanner = Arc::new(MarketScanner::new(client.clone()));
+        let scanner = Arc::new(MarketScanner::new(
+            client.clone(),
+            token_registry.clone(), // ← PASS IT HERE
+        ));
         let risk_manager = Arc::new(RwLock::new(RiskManager::new(RiskConfig::default())));
         let order_manager = Arc::new(OrderManager::new(
             client.clone(),
@@ -39,6 +45,7 @@ impl TradingOrchestrator {
             order_manager,
             risk_manager,
             ai_engine,
+            token_registry, // ← ADD THIS
             config,
             enabled: false, // Start disabled for safety
         }

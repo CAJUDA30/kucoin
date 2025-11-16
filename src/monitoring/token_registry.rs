@@ -214,6 +214,42 @@ impl TokenRegistry {
     pub async fn get_token_count(&self) -> usize {
         self.cache.read().await.len()
     }
+
+    // === HELPER METHODS FOR TRADING INTEGRATION ===
+
+    pub async fn get_all_active_symbols(&self) -> Result<Vec<String>> {
+        let cache = self.cache.read().await;
+        Ok(cache
+            .values()
+            .filter(|t| t.status == "active")
+            .map(|t| t.symbol.clone())
+            .collect())
+    }
+
+    pub async fn is_new_listing(&self, symbol: &str) -> bool {
+        if let Some(token) = self.cache.read().await.get(symbol) {
+            token.is_still_new()
+        } else {
+            false
+        }
+    }
+
+    pub async fn get_new_listings(&self) -> Result<Vec<String>> {
+        let cache = self.cache.read().await;
+        Ok(cache
+            .values()
+            .filter(|t| t.status == "active" && t.is_still_new())
+            .map(|t| t.symbol.clone())
+            .collect())
+    }
+
+    pub async fn is_delisted(&self, symbol: &str) -> bool {
+        if let Some(token) = self.cache.read().await.get(symbol) {
+            token.status == "delisted"
+        } else {
+            false
+        }
+    }
 }
 
 #[cfg(test)]

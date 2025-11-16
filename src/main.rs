@@ -126,10 +126,7 @@ async fn main() -> Result<()> {
         position_tracker.clone(),
     )));
 
-    let market_scanner = Arc::new(MarketScanner::new(kucoin_client.clone()));
-    let new_listing_detector = Arc::new(NewListingDetector::new(kucoin_client.clone()));
-
-    // Initialize comprehensive token monitoring system
+    // Initialize comprehensive token monitoring system FIRST
     tracing::info!("🗂️  Initializing token monitoring system...");
     
     let token_db = Arc::new(
@@ -143,6 +140,13 @@ async fn main() -> Result<()> {
         token_db.clone(),
         60, // Refresh every 60 seconds
     ));
+
+    // Initialize market scanner with token monitoring integration
+    let market_scanner = Arc::new(MarketScanner::new(
+        kucoin_client.clone(),
+        token_registry.clone(), // Pass token registry for NEW listing detection
+    ));
+    let new_listing_detector = Arc::new(NewListingDetector::new(kucoin_client.clone()));
     
     let token_detector = Arc::new(monitoring::NewTokenDetector::new(
         token_registry.clone(),
