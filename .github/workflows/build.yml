@@ -46,6 +46,24 @@ jobs:
       - name: Run Clippy (warnings allowed for now)
         run: cargo clippy --all-targets --all-features || true
 
+      - name: Create stub .env for build
+        run: |
+          cat > .env << 'EOF'
+          KUCOIN_API_KEY=test_key
+          KUCOIN_API_SECRET=test_secret
+          KUCOIN_API_PASSPHRASE=test_pass
+          KUCOIN_SANDBOX_MODE=true
+          POSTGRES_URL=postgresql://user:pass@localhost/tradingbot
+          REDIS_URL=redis://localhost:6379
+          MAX_POSITION_SIZE=0.2
+          MAX_LEVERAGE=10
+          DAILY_LOSS_LIMIT=0.2
+          AI_CONSENSUS_THRESHOLD=0.85
+          PROMETHEUS_PORT=9090
+          FRONTEND_PORT=3000
+          LOG_LEVEL=info
+          EOF
+
       - name: Build
         run: cargo build --release --verbose
 
