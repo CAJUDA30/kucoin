@@ -44,6 +44,9 @@ ort = "1.16"
 config = "0.13"
 dotenv = "0.15"
 
+# Web server
+warp = "0.3"
+
 # Utilities
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.6", features = ["v4", "serde"] }
