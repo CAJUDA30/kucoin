@@ -3,6 +3,7 @@ mod core;
 mod execution;
 mod scanner;
 mod strategy;
+mod trading;
 
 use anyhow::Result;
 use api::KuCoinClient;
