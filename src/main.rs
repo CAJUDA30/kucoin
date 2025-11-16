@@ -100,12 +100,12 @@ async fn main() -> Result<()> {
 }
 
 async fn start_health_server(health_checker: Arc<HealthChecker>, port: u16) {
-    let health = warp::path("health").and(warp::any().map(move || health_checker.clone())).and_then(
-        |checker: Arc<HealthChecker>| async move {
+    let health = warp::path("health")
+        .and(warp::any().map(move || health_checker.clone()))
+        .and_then(|checker: Arc<HealthChecker>| async move {
             let status = checker.get_status().await;
             Ok::<_, warp::Rejection>(warp::reply::json(&status))
-        },
-    );
+        });
 
     warp::serve(health).run(([0, 0, 0, 0], port)).await;
 }

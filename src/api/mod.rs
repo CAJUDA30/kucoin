@@ -1,3 +1,5 @@
+#![allow(unused_imports)] // Public API exports
+
 pub mod kucoin;
 pub mod types;
 pub mod websocket;

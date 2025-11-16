@@ -1,4 +1,4 @@
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, fmt};
+use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 pub fn init_logging(log_level: &str) {
     let env_filter = tracing_subscriber::EnvFilter::try_from_default_env()

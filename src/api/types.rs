@@ -58,4 +58,3 @@ pub struct MarketData {
     pub bid: f64,
     pub ask: f64,
 }
-

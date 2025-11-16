@@ -24,7 +24,13 @@ impl KuCoinClient {
         }
     }
 
-    fn generate_signature(&self, timestamp: u64, method: &str, endpoint: &str, body: &str) -> String {
+    fn generate_signature(
+        &self,
+        timestamp: u64,
+        method: &str,
+        endpoint: &str,
+        body: &str,
+    ) -> String {
         let str_to_sign = format!("{}{}{}{}", timestamp, method, endpoint, body);
 
         let mut mac = HmacSha256::new_from_slice(self.config.kucoin.api_secret.as_bytes())
@@ -48,9 +54,7 @@ impl KuCoinClient {
         endpoint: &str,
         body: Option<serde_json::Value>,
     ) -> Result<T> {
-        let timestamp = SystemTime::now()
-            .duration_since(UNIX_EPOCH)?
-            .as_millis() as u64;
+        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH)?.as_millis() as u64;
 
         let body_str = body
             .as_ref()

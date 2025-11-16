@@ -39,9 +39,7 @@ impl WebSocketManager {
             "response": true
         });
 
-        write
-            .send(Message::Text(subscribe_msg.to_string()))
-            .await?;
+        write.send(Message::Text(subscribe_msg.to_string())).await?;
         tracing::info!("Subscribed to ticker for {}", symbol);
 
         let sender = self.sender.clone();
