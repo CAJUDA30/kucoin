@@ -59,6 +59,28 @@ impl TokenRegistry {
             }
         });
 
+        // Start daily cleanup task for NEW badge updates
+        let database_cleanup = self.database.clone();
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(
+                tokio::time::Duration::from_secs(3600) // Check every hour
+            );
+
+            loop {
+                interval.tick().await;
+
+                match database_cleanup.update_new_status().await {
+                    Ok(count) if count > 0 => {
+                        tracing::info!("🔄 Removed NEW badge from {} tokens (older than 24h)", count);
+                    }
+                    Ok(_) => {}, // No updates needed
+                    Err(e) => {
+                        tracing::error!("❌ Failed to update NEW status: {}", e);
+                    }
+                }
+            }
+        });
+
         tracing::info!("✅ Token Registry started (refresh every {}s)", self.refresh_interval_secs);
 
         Ok(())
@@ -98,6 +120,8 @@ impl TokenRegistry {
                 } else {
                     "suspended".to_string()
                 },
+                is_new: is_new, // Set based on whether token existed before
+                delisted_at: None,
                 lot_size: Some(symbol.lot_size as f64),
                 tick_size: Some(symbol.tick_size),
                 multiplier: Some(symbol.multiplier),
@@ -126,16 +150,17 @@ impl TokenRegistry {
             updated_count += 1;
         }
 
-        // Log new listings
+        // Log new listings with visual badges
         if !new_symbols.is_empty() {
             tracing::info!("🆕 NEW LISTINGS DETECTED: {} tokens", new_symbols.len());
             for token in &new_symbols {
                 tracing::info!(
-                    "  • {} ({}/{}) - Status: {}",
+                    "  {} {} ({}/{}) - {}",
+                    token.get_badge(),
                     token.symbol,
                     token.base_currency,
                     token.quote_currency,
-                    token.status
+                    token.get_colored_status()
                 );
             }
         }
