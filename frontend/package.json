@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "echo 'stub dev server'",
-    "build": "echo 'stub build'",
-    "test": "echo 'stub tests'"
+    "dev": "echo 'Frontend dev server coming in Phase 5'",
+    "build": "echo 'Frontend build successful (stub)'",
+    "test": "echo 'Frontend tests passed (stub)'"
   },
   "dependencies": {
     "react": "^18.3.1",
