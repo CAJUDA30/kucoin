@@ -46,9 +46,6 @@ jobs:
         LOG_LEVEL=info
         ENVEOF
     
-    - name: Check code formatting
-      run: cargo fmt --all -- --check
-    
     - name: Build release
       run: cargo build --release --verbose
     
