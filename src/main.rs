@@ -1,6 +1,7 @@
 mod api;
 mod core;
 mod execution;
+mod monitoring;
 mod scanner;
 mod strategy;
 mod trading;
@@ -128,6 +129,51 @@ async fn main() -> Result<()> {
     let market_scanner = Arc::new(MarketScanner::new(kucoin_client.clone()));
     let new_listing_detector = Arc::new(NewListingDetector::new(kucoin_client.clone()));
 
+    // Initialize comprehensive token monitoring system
+    tracing::info!("🗂️  Initializing token monitoring system...");
+    
+    let token_db = Arc::new(
+        monitoring::TokenDatabase::new("/Users/carlosjulia/trading-bot-pro/data/tokens.db")
+            .await
+            .expect("Failed to initialize token database")
+    );
+    
+    let token_registry = Arc::new(monitoring::TokenRegistry::new(
+        kucoin_client.clone(),
+        token_db.clone(),
+        60, // Refresh every 60 seconds
+    ));
+    
+    let token_detector = Arc::new(monitoring::NewTokenDetector::new(
+        token_registry.clone(),
+        token_db.clone(),
+        30, // Check for new listings every 30 seconds
+    ));
+    
+    let token_reporter = Arc::new(monitoring::TokenReporter::new(token_db.clone()));
+    let api_verifier = Arc::new(monitoring::APIVerifier::new(kucoin_client.clone()));
+    
+    // Verify API completeness before starting
+    tracing::info!("🔍 Verifying API completeness...");
+    match api_verifier.verify_completeness().await {
+        Ok(verification) => {
+            tracing::info!("{}", api_verifier.format_verification_result(&verification));
+            if !verification.errors.is_empty() {
+                tracing::warn!("⚠️  API verification found errors, but continuing...");
+            }
+        }
+        Err(e) => {
+            tracing::error!("❌ API verification failed: {}", e);
+        }
+    }
+
+    // Start token monitoring system
+    token_registry.start().await?;
+    health_checker.update_component("token_registry", true).await;
+    
+    token_detector.start().await?;
+    health_checker.update_component("token_detector", true).await;
+    
     // Start market scanner
     market_scanner.start().await?;
     health_checker.update_component("market_scanner", true).await;
@@ -147,10 +193,17 @@ async fn main() -> Result<()> {
     tracing::info!("🤖 AI Strategy Engine: ACTIVE");
     tracing::info!("🔍 Market Scanner: ACTIVE");
     tracing::info!("🆕 New Listing Detector: ACTIVE");
+    tracing::info!("🗂️  Token Registry: ACTIVE ({} tokens tracked)", token_registry.get_token_count().await);
+    tracing::info!("🔔 Token Detector: ACTIVE");
     tracing::info!("");
     tracing::info!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     tracing::info!("🚀 BOT IS LIVE - Scanning markets and generating signals");
     tracing::info!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    
+    // Show initial monitoring summary
+    if let Ok(summary) = token_reporter.generate_summary().await {
+        tracing::info!("{}", token_reporter.format_summary(&summary));
+    }
 
     // Main trading loop
     let mut scan_interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
