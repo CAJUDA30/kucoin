@@ -4,6 +4,7 @@ mod execution;
 mod monitoring;
 mod scanner;
 mod strategy;
+mod streaming;
 mod trading;
 
 use anyhow::Result;

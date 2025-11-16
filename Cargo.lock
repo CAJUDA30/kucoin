@@ -1066,6 +1066,7 @@ dependencies = [
  "config",
  "dotenv",
  "futures",
+ "futures-util",
  "hmac",
  "mockall",
  "ort",
