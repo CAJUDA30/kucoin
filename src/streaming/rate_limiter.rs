@@ -15,9 +15,9 @@ pub struct RateLimiterConfig {
 impl Default for RateLimiterConfig {
     fn default() -> Self {
         Self {
-            max_requests: 1000,
-            window_duration_secs: 10,
-            burst_allowance: 100,
+            max_requests: 90,  // API limit is 100 msg/sec, using 90% for safety
+            window_duration_secs: 1,  // 1-second window for precise rate limiting
+            burst_allowance: 45,  // 50% burst allowance
         }
     }
 }

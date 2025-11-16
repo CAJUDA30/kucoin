@@ -31,7 +31,7 @@ impl Default for ConnectionConfig {
             ping_interval_secs: 30,
             message_buffer_size: 10000,
             connection_timeout_secs: 10,
-            max_concurrent_connections: 100,
+            max_concurrent_connections: 45,  // API limit is 50/IP, using 90% for safety
         }
     }
 }
