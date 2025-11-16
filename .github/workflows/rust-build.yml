@@ -6,7 +6,7 @@ on:
 
 jobs:
   compile:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     
     steps:
     - name: Checkout
@@ -15,9 +15,10 @@ jobs:
     - name: System deps
       run: |
         sudo apt update
-        sudo apt install -y build-essential pkg-config libssl-dev
+        sudo apt install -y build-essential pkg-config libssl-dev gcc-x86-64-linux-gnu
         which gcc
         gcc --version
+        which x86_64-linux-gnu-gcc || echo "x86_64-linux-gnu-gcc not found, using gcc"
     
     - name: Rust
       uses: dtolnay/rust-toolchain@stable
